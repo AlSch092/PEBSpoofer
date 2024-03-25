@@ -1,12 +1,10 @@
 //By Alsch092 @ github, March 2024
-// Proof of concept of how we can modify the PEB's address at runtime
+// Proof of concept of how we can modify the PEB's address at runtime and redirect it to our own PEB structure
 
 #ifdef _WIN64
 #define IS_64_BIT 1
-#define SIZE_PEB 0x2000
 #else
 #define IS_64_BIT 0
-#define SIZE_PEB 0x1000 
 #endif
 
 #include <windows.h>
@@ -139,9 +137,9 @@ BYTE* CopyPEBBytes(unsigned int pebSize)
 {
 	LPVOID pebAddress = GetPEBAddress();
 
-	BYTE* peb_bytes = new BYTE[pebSize];
+	BYTE* peb_bytes = new BYTE[sizeof(struct _MYPEB)];
 
-	BOOL success = ReadProcessMemory(GetCurrentProcess(), pebAddress, peb_bytes, pebSize, NULL);
+	BOOL success = ReadProcessMemory(GetCurrentProcess(), pebAddress, peb_bytes, sizeof(struct _MYPEB), NULL);
 	if (!success)
 	{
 		printf("Failed to copy PEB bytes. Error: %d\n", GetLastError());
@@ -154,7 +152,7 @@ BYTE* CopyPEBBytes(unsigned int pebSize)
 
 BYTE* SetNewPEB() //in this example, we are copying the original PEB to a byte array and then setting the pointer to the PEB to our byte array.
 {
-	BYTE* newPeb = CopyPEBBytes(SIZE_PEB);
+	BYTE* newPeb = CopyPEBBytes(sizeof(struct _MYPEB));
 
 	if (newPeb != NULL)
 	{
@@ -171,6 +169,12 @@ int main()
 	printf("Original PEB: %llx\n", pebAddr_Original);
 
 	BYTE* newPEBBytes = SetNewPEB(); //copy original PEB to byte*, change pointer of PEB to the byte*
+
+	if (newPEBBytes == NULL)
+	{
+		printf("Failed to copy PEB!\n");
+		exit(0);
+	}
 
 	_MYPEB* ourPEB = (_MYPEB*)&newPEBBytes[0];
 
